@@ -97,18 +97,27 @@ DEFAULT_SETTINGS = {
 def connect(db_path: str | Path | None = None) -> sqlite3.Connection:
     if db_path is None:
         db_path = os.environ.get("PORTFOLIO_DB", DEFAULT_DB)
-    db_path = Path(db_path) if str(db_path) != ":memory:" else db_path
-    if isinstance(db_path, Path):
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    is_mem = str(db_path) == ":memory:"
+    final_path = Path(db_path) if not is_mem else db_path
+    if isinstance(final_path, Path):
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+    is_default = (not is_mem and Path(final_path) == Path(DEFAULT_DB))
+    conn = sqlite3.connect(str(final_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    init_db(conn)
+    init_db(conn, seed_if_empty=is_default)
     return conn
 
 
-def init_db(conn: sqlite3.Connection) -> None:
+def init_db(conn: sqlite3.Connection, seed_if_empty: bool = True) -> None:
     conn.executescript(SCHEMA)
+    cur = conn.execute("SELECT COUNT(*) FROM owners")
+    if seed_if_empty and cur.fetchone()[0] == 0:
+        seed_path = Path(__file__).resolve().parent.parent / "data" / "init_data.sql"
+        if seed_path.exists():
+            with open(seed_path, "r", encoding="utf-8") as f:
+                conn.executescript(f.read())
+            conn.commit()
     for k, v in DEFAULT_SETTINGS.items():
         conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
     conn.commit()

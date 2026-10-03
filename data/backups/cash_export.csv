@@ -1,0 +1,12 @@
+﻿id,date,owner_id,type,amount,symbol,group_id,note
+29,2025-03-30,2,OPENING,40000000.0,,,Nạp tiền ban đầu
+30,2025-08-11,2,DIVIDEND,97346.0,MBB,,Cổ tức tiền MBB
+31,2025-12-01,2,DEPOSIT,10000000.0,,,Nạp tiền vào tài khoản
+32,2025-12-10,2,DEPOSIT,15000000.0,,,Nạp tiền vào tài khoản
+33,2026-06-01,2,DIVIDEND,230000.0,HPG,,Cổ tức tiền HPG
+34,2026-06-02,2,DEPOSIT,3000000.0,,,Nạp tiền vào tài khoản
+35,2026-07-22,2,DIVIDEND,570000.0,VHM,,Cổ tức tiền VHM
+36,2025-01-06,1,OPENING,15800000.0,,,Nạp tiền ban đầu
+37,2025-08-11,1,DIVIDEND,292037.0,MBB,,Cổ tức tiền MBB
+38,2026-06-03,1,DIVIDEND,240000.0,HPG,,Cổ tức tiền HPG
+39,2026-06-03,1,DIVIDEND,570000.0,VHM,,Cổ tức tiền VHM

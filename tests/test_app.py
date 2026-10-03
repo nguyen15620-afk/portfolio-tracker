@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-PAGES = ["📊 Tổng quan", "🛒 Lệnh mua/bán", "💵 Tiền & chuyển nhượng", "🎁 Cổ tức",
+PAGES = ["📊 Tổng quan", "📈 Hiệu suất đầu tư", "🛒 Lệnh mua/bán", "💵 Tiền & chuyển nhượng", "🎁 Cổ tức",
          "🏁 Số dư đầu kỳ", "🔍 Đối soát", "📒 Sổ giao dịch", "📥 Import", "⚙️ Cài đặt"]
 
 

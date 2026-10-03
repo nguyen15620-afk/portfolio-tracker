@@ -117,3 +117,31 @@ def test_delete_group(conn, owners):
     gid = E.add_trade(conn, "2026-01-02", "HPG", "BUY", 25_000, {me: 100, mom: 100})
     E.delete_group(conn, gid)
     assert E.positions(conn).empty
+
+
+def test_performance_by_period(conn, owners):
+    me, mom = owners
+    E.add_cash(conn, "2026-01-01", me, "DEPOSIT", 50_000_000)
+    E.add_trade(conn, "2026-01-02", "HPG", "BUY", 20_000, {me: 1000}, fee=0, tax=0)
+    E.add_trade(conn, "2026-01-15", "HPG", "SELL", 25_000, {me: 1000}, fee=0, tax=0)
+    # Cash dividend in Feb
+    E.add_cash(conn, "2026-02-10", me, "DIVIDEND", 1_000_000, symbol="HPG")
+
+    df_m = E.performance_by_period(conn, period="month", owner_id=me)
+    assert len(df_m) == 2
+    row_jan = df_m[df_m.period == "2026-01"].iloc[0]
+    assert row_jan.num_trades == 1
+    assert row_jan.win_trades == 1
+    assert row_jan.realized == pytest.approx(5_000_000)
+    assert row_jan.dividend == 0.0
+
+    row_feb = df_m[df_m.period == "2026-02"].iloc[0]
+    assert row_feb.num_trades == 0
+    assert row_feb.dividend == pytest.approx(1_000_000)
+    assert row_feb.total_profit == pytest.approx(1_000_000)
+
+    df_y = E.performance_by_period(conn, period="year", owner_id=me)
+    assert len(df_y) == 1
+    row_y = df_y.iloc[0]
+    assert row_y.period == "2026"
+    assert row_y.total_profit == pytest.approx(6_000_000)

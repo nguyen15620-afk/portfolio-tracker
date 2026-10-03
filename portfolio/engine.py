@@ -281,6 +281,116 @@ def positions(conn, as_of: str | None = None, inclusive: bool = True) -> pd.Data
     return pd.DataFrame(rows, columns=["owner_id", "symbol", "qty", "cost", "avg_cost", "realized"])
 
 
+def closed_trades_log(conn, as_of: str | None = None) -> pd.DataFrame:
+    """Detailed log of each closed/sell trade with calculated cost basis, proceeds, and realized P&L."""
+    trades = load_trades(conn, as_of)
+    owners = list_owners(conn)
+    state: dict[tuple[int, str], dict] = {}
+    records: list[dict] = []
+
+    for t in trades.itertuples():
+        s = state.setdefault((t.owner_id, t.symbol), {"qty": 0.0, "cost": 0.0})
+        if t.side in ("BUY",):
+            s["qty"] += t.qty
+            s["cost"] += t.qty * t.price + t.fee
+        elif t.side in ("OPEN", "TRANSFER_IN"):
+            s["qty"] += t.qty
+            s["cost"] += t.qty * t.price
+        elif t.side == "BONUS":
+            s["qty"] += t.qty
+        elif t.side in ("SELL", "TRANSFER_OUT"):
+            avg = s["cost"] / s["qty"] if s["qty"] else 0.0
+            cost_out = avg * t.qty
+            if t.side == "SELL":
+                revenue = t.qty * t.price - t.fee - t.tax
+                pnl = revenue - cost_out
+                ret_pct = pnl / cost_out if cost_out else 0.0
+                records.append({
+                    "date": t.date,
+                    "year": str(t.date)[:4],
+                    "month": str(t.date)[:7],
+                    "owner_id": t.owner_id,
+                    "owner": owners.get(t.owner_id, str(t.owner_id)),
+                    "symbol": t.symbol,
+                    "qty": t.qty,
+                    "sell_price": t.price,
+                    "avg_cost": avg,
+                    "cost_out": cost_out,
+                    "fee": t.fee,
+                    "tax": t.tax,
+                    "revenue": revenue,
+                    "realized": pnl,
+                    "return_pct": ret_pct,
+                    "note": t.note or "",
+                })
+            s["cost"] -= cost_out
+            s["qty"] -= t.qty
+            if abs(s["qty"]) < 1e-9:
+                s["qty"], s["cost"] = 0.0, 0.0
+
+    cols = ["date", "year", "month", "owner_id", "owner", "symbol", "qty", "sell_price",
+            "avg_cost", "cost_out", "fee", "tax", "revenue", "realized", "return_pct", "note"]
+    return pd.DataFrame(records, columns=cols)
+
+
+def performance_by_period(conn, period: str = "month", owner_id: int | None = None) -> pd.DataFrame:
+    """Aggregate trading performance (realized P&L, dividend, win/loss rate) by month ('YYYY-MM') or year ('YYYY')."""
+    period_col = "year" if period == "year" else "month"
+    df_closed = closed_trades_log(conn)
+    if owner_id is not None:
+        df_closed = df_closed[df_closed.owner_id == owner_id]
+
+    # Cash dividends
+    cash = load_cash(conn)
+    div_df = cash[cash.type == "DIVIDEND"].copy()
+    if owner_id is not None:
+        div_df = div_df[div_df.owner_id == owner_id]
+
+    if not div_df.empty:
+        div_df["period"] = div_df["date"].str[:4] if period == "year" else div_df["date"].str[:7]
+        div_agg = div_df.groupby("period")["amount"].sum().to_dict()
+    else:
+        div_agg = {}
+
+    if df_closed.empty and not div_agg:
+        return pd.DataFrame(columns=[
+            "period", "num_trades", "win_trades", "loss_trades", "win_rate",
+            "cost_out", "revenue", "realized", "dividend", "total_profit", "return_pct"
+        ])
+
+    periods = sorted(set(df_closed[period_col].dropna().unique()) | set(div_agg.keys()))
+    rows = []
+    for p in periods:
+        sub = df_closed[df_closed[period_col] == p] if not df_closed.empty else pd.DataFrame()
+        n_trades = len(sub)
+        n_win = int((sub.realized > 0).sum()) if n_trades else 0
+        n_loss = int((sub.realized < 0).sum()) if n_trades else 0
+        win_rate = (n_win / n_trades * 100) if n_trades else 0.0
+        c_out = float(sub.cost_out.sum()) if n_trades else 0.0
+        rev = float(sub.revenue.sum()) if n_trades else 0.0
+        realized = float(sub.realized.sum()) if n_trades else 0.0
+        div = float(div_agg.get(p, 0.0))
+        total_profit = realized + div
+        ret_pct = (total_profit / c_out * 100) if c_out > 0 else 0.0
+
+        rows.append({
+            "period": p,
+            "num_trades": n_trades,
+            "win_trades": n_win,
+            "loss_trades": n_loss,
+            "win_rate": win_rate,
+            "cost_out": c_out,
+            "revenue": rev,
+            "realized": realized,
+            "dividend": div,
+            "total_profit": total_profit,
+            "return_pct": ret_pct,
+        })
+
+    return pd.DataFrame(rows)
+
+
+
 def _held(pos: pd.DataFrame, owner_id: int, symbol: str) -> float:
     m = pos[(pos.owner_id == owner_id) & (pos.symbol == symbol)]
     return float(m.qty.sum()) if not m.empty else 0.0

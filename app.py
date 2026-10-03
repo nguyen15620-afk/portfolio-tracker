@@ -70,7 +70,7 @@ OW_IDS = list(OW)
 
 page = st.sidebar.radio(
     "Menu",
-    ["📊 Tổng quan", "🛒 Lệnh mua/bán", "💵 Tiền & chuyển nhượng", "🎁 Cổ tức",
+    ["📊 Tổng quan", "📈 Hiệu suất đầu tư", "🛒 Lệnh mua/bán", "💵 Tiền & chuyển nhượng", "🎁 Cổ tức",
      "🏁 Số dư đầu kỳ", "🔍 Đối soát", "📒 Sổ giao dịch", "📥 Import", "⚙️ Cài đặt"],
 )
 st.sidebar.caption("Giá cổ phiếu nhập theo **nghìn đồng** (vd 62.7 = 62.700đ) hoặc VND đầy đủ.")
@@ -193,6 +193,221 @@ if page == "📊 Tổng quan":
         hc2.plotly_chart(fig, use_container_width=True)
     else:
         hc2.info("Chưa có dữ liệu lịch sử. Mỗi lần mở trang Tổng quan, hệ thống lưu lại NAV của ngày hôm đó.")
+
+
+# ================================================================== PERFORMANCE
+elif page == "📈 Hiệu suất đầu tư":
+    st.title("📈 Hiệu suất đầu tư & Lãi/Lỗ theo thời gian")
+    st.caption("Thống kê chi tiết lợi nhuận chốt lời/cắt lỗ từ các lệnh bán và cổ tức tiền theo từng tháng, từng năm.")
+
+    # Owner filter
+    owner_options = {"all": "Toàn tài khoản (Tất cả thành viên)"}
+    owner_options.update({o: OW[o] for o in OW_IDS})
+    sel_owner = st.selectbox("Chọn đối tượng theo dõi", list(owner_options.keys()),
+                             format_func=lambda k: owner_options[k])
+    filter_oid = None if sel_owner == "all" else sel_owner
+
+    # Summary Metrics across whole history
+    df_closed = E.closed_trades_log(conn)
+    if filter_oid is not None:
+        df_closed = df_closed[df_closed.owner_id == filter_oid]
+
+    total_realized = float(df_closed.realized.sum()) if not df_closed.empty else 0.0
+    cash_all = E.load_cash(conn)
+    div_df = cash_all[cash_all.type == "DIVIDEND"].copy()
+    if filter_oid is not None:
+        div_df = div_df[div_df.owner_id == filter_oid]
+    total_div = float(div_df.amount.sum()) if not div_df.empty else 0.0
+    total_profit_all = total_realized + total_div
+    total_trades = len(df_closed)
+    win_trades = int((df_closed.realized > 0).sum()) if total_trades else 0
+    loss_trades = int((df_closed.realized < 0).sum()) if total_trades else 0
+    win_rate = (win_trades / total_trades * 100) if total_trades else 0.0
+
+    mc = st.columns(4)
+    mc[0].metric("Tổng lợi nhuận thực nhận", vnd(total_profit_all))
+    mc[1].metric("Lãi chốt giao dịch", vnd(total_realized))
+    mc[2].metric("Cổ tức tiền mặt", vnd(total_div))
+    mc[3].metric("Tỷ lệ thắng (Win Rate)", f"{win_rate:.1f}%", f"{win_trades} thắng / {loss_trades} thua")
+
+    st.divider()
+
+    # Tabs for breakdown
+    t_year, t_month, t_symbol, t_log = st.tabs(["📅 Theo từng năm", "📆 Theo từng tháng", "🏷️ Theo mã cổ phiếu", "📜 Nhật ký chốt lời/lỗ"])
+
+    with t_year:
+        st.subheader("Hiệu suất theo từng năm")
+        df_year = E.performance_by_period(conn, period="year", owner_id=filter_oid)
+        if df_year.empty:
+            st.info("Chưa có giao dịch chốt lời/lỗ hoặc cổ tức trong các năm.")
+        else:
+            # Bar chart for Yearly Profit
+            fig_y = px.bar(
+                df_year, x="period", y="total_profit",
+                color="total_profit",
+                color_continuous_scale=["#dc2626", "#e5e7eb", "#16a34a"],
+                labels={"period": "Năm", "total_profit": "Tổng lợi nhuận (VND)"},
+                title="Lợi nhuận theo năm (Lãi chốt + Cổ tức)",
+                text_auto=True,
+            )
+            fig_y.update_layout(height=340, yaxis_tickformat=",.0f", coloraxis_showscale=False)
+            st.plotly_chart(fig_y, use_container_width=True)
+
+            # Table display
+            show_y = pd.DataFrame({
+                "Năm": df_year.period,
+                "Số lệnh bán": df_year.num_trades,
+                "Thắng": df_year.win_trades,
+                "Thua": df_year.loss_trades,
+                "Tỷ lệ thắng %": df_year.win_rate,
+                "Giá vốn bán ra": df_year.cost_out,
+                "Doanh thu bán": df_year.revenue,
+                "Lãi/Lỗ chốt (VND)": df_year.realized,
+                "Cổ tức tiền (VND)": df_year.dividend,
+                "Tổng lợi nhuận (VND)": df_year.total_profit,
+                "Tỷ suất sinh lời %": df_year.return_pct,
+            })
+            st.dataframe(
+                show_y.style.format({
+                    "Số lệnh bán": "{:,.0f}", "Thắng": "{:,.0f}", "Thua": "{:,.0f}",
+                    "Tỷ lệ thắng %": "{:.1f}%", "Giá vốn bán ra": "{:,.0f}",
+                    "Doanh thu bán": "{:,.0f}", "Lãi/Lỗ chốt (VND)": "{:+,.0f}",
+                    "Cổ tức tiền (VND)": "{:,.0f}", "Tổng lợi nhuận (VND)": "{:+,.0f}",
+                    "Tỷ suất sinh lời %": "{:+.2f}%",
+                }).map(lambda v: "color: #16a34a; font-weight: bold" if v > 0 else ("color: #dc2626; font-weight: bold" if v < 0 else ""),
+                       subset=["Lãi/Lỗ chốt (VND)", "Tổng lợi nhuận (VND)", "Tỷ suất sinh lời %"]),
+                hide_index=True, use_container_width=True
+            )
+
+    with t_month:
+        st.subheader("Hiệu suất theo từng tháng")
+        df_month = E.performance_by_period(conn, period="month", owner_id=filter_oid)
+        if df_month.empty:
+            st.info("Chưa có giao dịch chốt lời/lỗ hoặc cổ tức theo tháng.")
+        else:
+            # Bar chart for Monthly Profit
+            colors = ["#16a34a" if p >= 0 else "#dc2626" for p in df_month.total_profit]
+            fig_m = px.bar(
+                df_month, x="period", y="total_profit",
+                labels={"period": "Tháng (YYYY-MM)", "total_profit": "Tổng lợi nhuận (VND)"},
+                title="Biểu đồ lãi/lỗ theo từng tháng",
+            )
+            fig_m.update_traces(marker_color=colors)
+            fig_m.update_layout(height=360, yaxis_tickformat=",.0f")
+            st.plotly_chart(fig_m, use_container_width=True)
+
+            # Table display
+            show_m = pd.DataFrame({
+                "Tháng": df_month.period,
+                "Số lệnh": df_month.num_trades,
+                "Thắng": df_month.win_trades,
+                "Thua": df_month.loss_trades,
+                "Tỷ lệ thắng %": df_month.win_rate,
+                "Giá vốn": df_month.cost_out,
+                "Doanh thu": df_month.revenue,
+                "Lãi chốt": df_month.realized,
+                "Cổ tức": df_month.dividend,
+                "Tổng LN": df_month.total_profit,
+                "Tỷ suất %": df_month.return_pct,
+            })
+            st.dataframe(
+                show_m.sort_values("Tháng", ascending=False).style.format({
+                    "Số lệnh": "{:,.0f}", "Thắng": "{:,.0f}", "Thua": "{:,.0f}",
+                    "Tỷ lệ thắng %": "{:.1f}%", "Giá vốn": "{:,.0f}",
+                    "Doanh thu": "{:,.0f}", "Lãi chốt": "{:+,.0f}",
+                    "Cổ tức": "{:,.0f}", "Tổng LN": "{:+,.0f}",
+                    "Tỷ suất %": "{:+.2f}%",
+                }).map(lambda v: "color: #16a34a; font-weight: bold" if v > 0 else ("color: #dc2626; font-weight: bold" if v < 0 else ""),
+                       subset=["Lãi chốt", "Tổng LN", "Tỷ suất %"]),
+                hide_index=True, use_container_width=True
+            )
+
+    with t_symbol:
+        st.subheader("Tổng kết lãi/lỗ theo từng mã cổ phiếu đã giao dịch")
+        if df_closed.empty:
+            st.info("Chưa có giao dịch bán.")
+        else:
+            sym_grp = df_closed.groupby("symbol").agg(
+                trades=("realized", "count"),
+                wins=("realized", lambda s: (s > 0).sum()),
+                losses=("realized", lambda s: (s < 0).sum()),
+                cost_out=("cost_out", "sum"),
+                revenue=("revenue", "sum"),
+                realized=("realized", "sum"),
+            ).reset_index()
+
+            # Add dividends per symbol
+            if not div_df.empty:
+                div_sym = div_df.groupby("symbol")["amount"].sum().to_dict()
+            else:
+                div_sym = {}
+
+            sym_grp["dividend"] = sym_grp["symbol"].map(lambda s: div_sym.get(s, 0.0))
+            sym_grp["total_profit"] = sym_grp["realized"] + sym_grp["dividend"]
+            sym_grp["win_rate"] = sym_grp["wins"] / sym_grp["trades"] * 100
+            sym_grp["return_pct"] = sym_grp.apply(lambda r: (r["total_profit"] / r["cost_out"] * 100) if r["cost_out"] else 0.0, axis=1)
+
+            sym_grp = sym_grp.sort_values("total_profit", ascending=False)
+
+            fig_sym = px.bar(
+                sym_grp, x="symbol", y="total_profit",
+                labels={"symbol": "Mã CK", "total_profit": "Tổng LN (VND)"},
+                title="Lợi nhuận theo từng mã cổ phiếu",
+            )
+            fig_sym.update_traces(marker_color=["#16a34a" if p >= 0 else "#dc2626" for p in sym_grp.total_profit])
+            fig_sym.update_layout(height=360, yaxis_tickformat=",.0f")
+            st.plotly_chart(fig_sym, use_container_width=True)
+
+            show_sym = pd.DataFrame({
+                "Mã": sym_grp.symbol,
+                "Số lệnh bán": sym_grp.trades,
+                "Thắng / Thua": sym_grp.apply(lambda r: f"{int(r.wins)} / {int(r.losses)}", axis=1),
+                "Win Rate %": sym_grp.win_rate,
+                "Tổng vốn bán": sym_grp.cost_out,
+                "Doanh thu bán": sym_grp.revenue,
+                "Lãi chốt": sym_grp.realized,
+                "Cổ tức": sym_grp.dividend,
+                "Tổng LN": sym_grp.total_profit,
+                "Hiệu suất %": sym_grp.return_pct,
+            })
+            st.dataframe(
+                show_sym.style.format({
+                    "Số lệnh bán": "{:,.0f}", "Win Rate %": "{:.1f}%",
+                    "Tổng vốn bán": "{:,.0f}", "Doanh thu bán": "{:,.0f}",
+                    "Lãi chốt": "{:+,.0f}", "Cổ tức": "{:,.0f}",
+                    "Tổng LN": "{:+,.0f}", "Hiệu suất %": "{:+.2f}%",
+                }).map(lambda v: "color: #16a34a; font-weight: bold" if v > 0 else ("color: #dc2626; font-weight: bold" if v < 0 else ""),
+                       subset=["Lãi chốt", "Tổng LN", "Hiệu suất %"]),
+                hide_index=True, use_container_width=True
+            )
+
+    with t_log:
+        st.subheader("Chi tiết từng lệnh bán (đối soát giá vốn & lãi/lỗ)")
+        if df_closed.empty:
+            st.info("Chưa có lệnh bán nào.")
+        else:
+            show_log = pd.DataFrame({
+                "Ngày": df_closed.date,
+                "Người": df_closed.owner,
+                "Mã": df_closed.symbol,
+                "Khối lượng": df_closed.qty,
+                "Giá vốn TB": df_closed.avg_cost,
+                "Giá bán": df_closed.sell_price,
+                "Tổng vốn": df_closed.cost_out,
+                "Thu về (sau thuế phí)": df_closed.revenue,
+                "Lãi/Lỗ chốt": df_closed.realized,
+                "% Lãi/Lỗ": df_closed.return_pct * 100,
+                "Ghi chú": df_closed.note,
+            })
+            st.dataframe(
+                show_log.sort_values("Ngày", ascending=False).style.format({
+                    "Khối lượng": "{:,.0f}", "Giá vốn TB": "{:,.0f}", "Giá bán": "{:,.0f}",
+                    "Tổng vốn": "{:,.0f}", "Thu về (sau thuế phí)": "{:,.0f}",
+                    "Lãi/Lỗ chốt": "{:+,.0f}", "% Lãi/Lỗ": "{:+.2f}%",
+                }).map(lambda v: "color: #16a34a" if v > 0 else ("color: #dc2626" if v < 0 else ""),
+                       subset=["Lãi/Lỗ chốt", "% Lãi/Lỗ"]),
+                hide_index=True, use_container_width=True
+            )
 
 
 # ================================================================== TRADES

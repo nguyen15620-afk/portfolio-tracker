@@ -108,13 +108,28 @@ if page == "📊 Tổng quan":
     E.record_snapshot(conn, px_map)
 
     cols = st.columns(len(summ) + 1)
+    # Fetch breakdown of contributions per owner
+    cash_df_all = E.load_cash(conn)
     for col, s in zip(cols, summ):
         with col.container(border=True):
             st.subheader(s.name)
             st.metric("Tài sản ròng (NAV)", vnd(s.nav), f"{vnd(s.pnl)} ({pct(s.pnl_pct)})")
+            
+            # Show breakdown of contributions
+            sub_cash = cash_df_all[cash_df_all.owner_id == s.owner_id] if not cash_df_all.empty else pd.DataFrame()
+            open_amt = float(sub_cash[sub_cash.type == "OPENING"]["amount"].sum()) if not sub_cash.empty else 0.0
+            dep_amt = float(sub_cash[sub_cash.type == "DEPOSIT"]["amount"].sum()) if not sub_cash.empty else 0.0
+            with_amt = float(sub_cash[sub_cash.type == "WITHDRAW"]["amount"].sum()) if not sub_cash.empty else 0.0
+            
             st.write(f"Vốn góp ròng: **{vnd(s.net_contrib)}**")
-            st.write(f"Tiền mặt: **{vnd(s.cash)}**")
-            st.write(f"Giá trị CP: **{vnd(s.market_value)}**")
+            with st.expander("🔍 Chi tiết vốn đã nạp", expanded=False):
+                st.write(f"• Số dư đầu kỳ: **{vnd(open_amt)}**")
+                st.write(f"• Nạp thêm (Deposit): **{vnd(dep_amt)}**")
+                if with_amt:
+                    st.write(f"• Rút bớt (Withdraw): **{vnd(with_amt)}**")
+            
+            st.write(f"Tiền mặt khả dụng: **{vnd(s.cash)}**")
+            st.write(f"Giá trị CP hiện tại: **{vnd(s.market_value)}**")
             st.write(f"Lãi/lỗ đã chốt: **{vnd(s.realized)}** · Tạm tính: **{vnd(s.unrealized)}**")
             st.write(f"Cổ tức tiền đã nhận: **{vnd(s.dividends)}**")
             if total_nav:

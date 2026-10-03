@@ -969,8 +969,21 @@ elif page == "⚙️ Cài đặt":
             db.set_setting(conn, "sell_tax_rate", stax / 100)
             db.set_setting(conn, "div_tax_rate", dtax / 100)
             ok("Đã lưu cài đặt thuế phí!")
-    st.subheader("Thành viên")
-    st.write(", ".join(OW.values()))
+    st.subheader("Thành viên & Vốn góp ròng")
+    st.caption("Có thể cố định con số Vốn góp ròng cho từng thành viên để đối soát chính xác theo mong muốn.")
+    with st.form("custom_contrib"):
+        cc_cols = st.columns(len(OW))
+        contrib_inputs = {}
+        for i, o in enumerate(OW_IDS):
+            cur_custom = db.get_setting(conn, f"custom_net_contrib_{o}")
+            val = float(cur_custom) if cur_custom is not None else float(E.net_contributions(conn).get(o, 0.0))
+            contrib_inputs[o] = cc_cols[i].number_input(f"Vốn góp ròng của {OW[o]} (đ)", min_value=0.0, value=val, step=1_000_000.0, format="%.0f")
+        if st.form_submit_button("Lưu vốn góp ròng"):
+            for o, v in contrib_inputs.items():
+                db.set_setting(conn, f"custom_net_contrib_{o}", str(v))
+            ok("Đã cập nhật vốn góp ròng!")
+            st.rerun()
+
     with st.form("addowner", clear_on_submit=True):
         n = st.text_input("Thêm thành viên")
         if st.form_submit_button("Thêm") and n.strip():

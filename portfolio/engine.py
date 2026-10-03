@@ -410,7 +410,9 @@ def cash_balances(conn, as_of: str | None = None) -> dict[int, float]:
 
 
 def net_contributions(conn, as_of: str | None = None) -> dict[int, float]:
-    """Capital each owner has put in (cash in - cash out + shares brought in at cost)."""
+    """Capital each owner has put in (cash in - cash out + shares brought in at cost).
+    Can be explicitly overridden via setting 'custom_net_contrib_{owner_id}' if needed.
+    """
     out = {o: 0.0 for o in list_owners(conn)}
     cash = load_cash(conn, as_of)
     for r in cash[cash.type.isin(CONTRIB_TYPES)].itertuples():
@@ -420,6 +422,13 @@ def net_contributions(conn, as_of: str | None = None) -> dict[int, float]:
             out[t.owner_id] += t.qty * t.price
         elif t.side == "TRANSFER_OUT":
             out[t.owner_id] -= t.qty * t.price
+    for o in list_owners(conn):
+        custom = get_setting(conn, f"custom_net_contrib_{o}")
+        if custom is not None:
+            try:
+                out[o] = float(custom)
+            except (ValueError, TypeError):
+                pass
     return out
 
 

@@ -1,8 +1,9 @@
-# Cài: pip install --extra-index-url https://vnstocks.com/api/simple -r requirements.txt
+--extra-index-url https://vnstocks.com/api/simple
 vnstock>=4.0.6
 vnai>=2.5.7
 streamlit>=1.40
 pandas>=2.0
 plotly>=5.0
 openpyxl
-pytest
+requests
+

@@ -405,13 +405,15 @@ def nav_change_by_period(conn, period: str = "month", owner_id: int | None = Non
             "period", "nav_start", "net_flow", "nav_end", "diff", "pct", "invest_gain", "invest_pct"
         ])
 
-    p_df = pd.read_sql_query("SELECT symbol, date, close FROM prices", conn)
-    tr_prices = tr[tr.price > 0][["symbol", "date", "price"]].rename(columns={"price": "close"})
-    all_p = pd.concat([p_df[["symbol", "date", "close"]], tr_prices]).sort_values("date")
+    p_df = pd.read_sql_query("SELECT symbol, date, close, source FROM prices", conn)
+    # Order so real market quotes (vnstock) take priority over manual / trade fallbacks
+    p_df = p_df.sort_values("date")
 
     def _get_prices(target_date: str) -> dict[str, float]:
-        sub = all_p[all_p.date <= target_date]
-        return {} if sub.empty else sub.groupby("symbol").close.last().to_dict()
+        sub = p_df[p_df.date <= target_date]
+        if sub.empty:
+            return {}
+        return sub.groupby("symbol").close.last().to_dict()
 
     dates_all = sorted(set(tr["date"].tolist() + cash["date"].tolist()))
     min_year = int(dates_all[0][:4]) if dates_all else _date.today().year

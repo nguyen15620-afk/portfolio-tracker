@@ -390,6 +390,112 @@ def performance_by_period(conn, period: str = "month", owner_id: int | None = No
     return pd.DataFrame(rows)
 
 
+def nav_change_by_period(conn, period: str = "month", owner_id: int | None = None) -> pd.DataFrame:
+    """Calculate start-of-period vs end-of-period NAV changes, net cash flows, and performance.
+    
+    period: 'month' (e.g. 2025-01) or 'year' (e.g. 2025).
+    owner_id: None for total portfolio, or specific owner_id.
+    """
+    import calendar
+
+    tr = load_trades(conn)
+    cash = load_cash(conn)
+    if tr.empty and cash.empty:
+        return pd.DataFrame(columns=[
+            "period", "nav_start", "net_flow", "nav_end", "diff", "pct", "invest_gain", "invest_pct"
+        ])
+
+    p_df = pd.read_sql_query("SELECT symbol, date, close FROM prices", conn)
+    tr_prices = tr[tr.price > 0][["symbol", "date", "price"]].rename(columns={"price": "close"})
+    all_p = pd.concat([p_df[["symbol", "date", "close"]], tr_prices]).sort_values("date")
+
+    def _get_prices(target_date: str) -> dict[str, float]:
+        sub = all_p[all_p.date <= target_date]
+        return {} if sub.empty else sub.groupby("symbol").close.last().to_dict()
+
+    dates_all = sorted(set(tr["date"].tolist() + cash["date"].tolist()))
+    min_year = int(dates_all[0][:4]) if dates_all else _date.today().year
+    today_str = _date.today().isoformat()
+    max_year = int(today_str[:4])
+
+    rows = []
+    if period == "year":
+        prev_nav = 0.0
+        for y in range(min_year, max_year + 1):
+            y_str = str(y)
+            end_d = min(f"{y_str}-12-31", today_str)
+            px_e = _get_prices(end_d)
+            summ_e = summary(conn, px_e, end_d)
+            nav_e = sum(s.nav for s in summ_e if owner_id is None or s.owner_id == owner_id)
+
+            cash_y = cash[cash.date.str.startswith(y_str)]
+            if owner_id is not None:
+                cash_y = cash_y[cash_y.owner_id == owner_id]
+            inflow = float(cash_y[cash_y.type.isin(["OPENING", "DEPOSIT"])].amount.sum())
+            outflow = float(cash_y[cash_y.type == "WITHDRAW"].amount.sum())
+            net_flow = inflow - outflow
+
+            nav_s = prev_nav
+            diff = nav_e - nav_s
+            pct = (diff / nav_s * 100) if nav_s > 0 else 0.0
+            invest_gain = diff - net_flow
+            invest_pct = (invest_gain / (nav_s + net_flow) * 100) if (nav_s + net_flow) > 0 else 0.0
+
+            rows.append({
+                "period": y_str,
+                "nav_start": nav_s,
+                "net_flow": net_flow,
+                "nav_end": nav_e,
+                "diff": diff,
+                "pct": pct,
+                "invest_gain": invest_gain,
+                "invest_pct": invest_pct,
+            })
+            prev_nav = nav_e
+    else:  # month
+        months = []
+        for y in range(min_year, max_year + 1):
+            for m in range(1, 13):
+                ym = f"{y:04d}-{m:02d}"
+                if ym >= dates_all[0][:7] and ym <= today_str[:7]:
+                    months.append(ym)
+        prev_nav = 0.0
+        for ym in months:
+            y_int, m_int = map(int, ym.split("-"))
+            last_day = calendar.monthrange(y_int, m_int)[1]
+            end_d = min(f"{ym}-{last_day:02d}", today_str)
+            px_e = _get_prices(end_d)
+            summ_e = summary(conn, px_e, end_d)
+            nav_e = sum(s.nav for s in summ_e if owner_id is None or s.owner_id == owner_id)
+
+            cash_m = cash[cash.date.str.startswith(ym)]
+            if owner_id is not None:
+                cash_m = cash_m[cash_m.owner_id == owner_id]
+            inflow = float(cash_m[cash_m.type.isin(["OPENING", "DEPOSIT"])].amount.sum())
+            outflow = float(cash_m[cash_m.type == "WITHDRAW"].amount.sum())
+            net_flow = inflow - outflow
+
+            nav_s = prev_nav
+            diff = nav_e - nav_s
+            pct = (diff / nav_s * 100) if nav_s > 0 else 0.0
+            invest_gain = diff - net_flow
+            invest_pct = (invest_gain / (nav_s + net_flow) * 100) if (nav_s + net_flow) > 0 else 0.0
+
+            rows.append({
+                "period": ym,
+                "nav_start": nav_s,
+                "net_flow": net_flow,
+                "nav_end": nav_e,
+                "diff": diff,
+                "pct": pct,
+                "invest_gain": invest_gain,
+                "invest_pct": invest_pct,
+            })
+            prev_nav = nav_e
+
+    return pd.DataFrame(rows)
+
+
 
 def _held(pos: pd.DataFrame, owner_id: int, symbol: str) -> float:
     m = pos[(pos.owner_id == owner_id) & (pos.symbol == symbol)]

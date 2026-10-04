@@ -251,7 +251,44 @@ elif page == "📈 Hiệu suất đầu tư":
     t_year, t_month, t_symbol, t_log = st.tabs(["📅 Theo từng năm", "📆 Theo từng tháng", "🏷️ Theo mã cổ phiếu", "📜 Nhật ký chốt lời/lỗ"])
 
     with t_year:
-        st.subheader("Hiệu suất theo từng năm")
+        st.subheader("1. Biến động tài sản ròng (NAV) theo năm")
+        st.caption("So sánh NAV đầu năm và cuối năm (có bóc tách dòng tiền nạp/rút) để thấy quy mô tài sản tăng/giảm.")
+        df_nav_y = E.nav_change_by_period(conn, period="year", owner_id=filter_oid)
+        if not df_nav_y.empty:
+            # Bar chart for NAV growth
+            fig_ny = px.bar(
+                df_nav_y, x="period", y="invest_gain",
+                color="invest_gain",
+                color_continuous_scale=["#dc2626", "#e5e7eb", "#16a34a"],
+                labels={"period": "Năm", "invest_gain": "Lợi nhuận đầu tư thuần (VND)"},
+                title="Tăng trưởng tài sản thuần từ đầu tư theo năm (Đã loại trừ vốn nạp/rút)",
+                text_auto=True,
+            )
+            fig_ny.update_layout(height=320, yaxis_tickformat=",.0f", coloraxis_showscale=False)
+            st.plotly_chart(fig_ny, use_container_width=True)
+
+            show_ny = pd.DataFrame({
+                "Năm": df_nav_y.period,
+                "NAV đầu năm": df_nav_y.nav_start,
+                "Vốn nạp/rút ròng": df_nav_y.net_flow,
+                "NAV cuối năm": df_nav_y.nav_end,
+                "Biến động NAV": df_nav_y["diff"],
+                "Tăng trưởng NAV %": df_nav_y.pct,
+                "Lợi nhuận từ đầu tư": df_nav_y.invest_gain,
+                "Tỷ suất sinh lời thuần %": df_nav_y.invest_pct,
+            })
+            st.dataframe(
+                show_ny.style.format({
+                    "NAV đầu năm": "{:,.0f}", "Vốn nạp/rút ròng": "{:+,.0f}",
+                    "NAV cuối năm": "{:,.0f}", "Biến động NAV": "{:+,.0f}",
+                    "Tăng trưởng NAV %": "{:+.2f}%", "Lợi nhuận từ đầu tư": "{:+,.0f}",
+                    "Tỷ suất sinh lời thuần %": "{:+.2f}%",
+                }).map(lambda v: "color: #16a34a; font-weight: bold" if v > 0 else ("color: #dc2626; font-weight: bold" if v < 0 else ""),
+                       subset=["Biến động NAV", "Tăng trưởng NAV %", "Lợi nhuận từ đầu tư", "Tỷ suất sinh lời thuần %"]),
+                hide_index=True, use_container_width=True
+            )
+
+        st.subheader("2. Chi tiết lãi đã chốt & Cổ tức theo từng năm")
         df_year = E.performance_by_period(conn, period="year", owner_id=filter_oid)
         if df_year.empty:
             st.info("Chưa có giao dịch chốt lời/lỗ hoặc cổ tức trong các năm.")
@@ -262,10 +299,10 @@ elif page == "📈 Hiệu suất đầu tư":
                 color="total_profit",
                 color_continuous_scale=["#dc2626", "#e5e7eb", "#16a34a"],
                 labels={"period": "Năm", "total_profit": "Tổng lợi nhuận (VND)"},
-                title="Lợi nhuận theo năm (Lãi chốt + Cổ tức)",
+                title="Lợi nhuận đã hiện thực hoá theo năm (Lãi chốt lệnh + Cổ tức tiền)",
                 text_auto=True,
             )
-            fig_y.update_layout(height=340, yaxis_tickformat=",.0f", coloraxis_showscale=False)
+            fig_y.update_layout(height=320, yaxis_tickformat=",.0f", coloraxis_showscale=False)
             st.plotly_chart(fig_y, use_container_width=True)
 
             # Table display
@@ -295,7 +332,42 @@ elif page == "📈 Hiệu suất đầu tư":
             )
 
     with t_month:
-        st.subheader("Hiệu suất theo từng tháng")
+        st.subheader("1. Biến động tài sản ròng (NAV) đầu tháng so với cuối tháng")
+        st.caption("Theo dõi tài sản ròng tăng hay giảm qua từng tháng, bóc tách dòng tiền nộp/rút và lợi nhuận thực tế từ thị trường.")
+        df_nav_m = E.nav_change_by_period(conn, period="month", owner_id=filter_oid)
+        if not df_nav_m.empty:
+            colors_nav_m = ["#16a34a" if p >= 0 else "#dc2626" for p in df_nav_m.invest_gain]
+            fig_nm = px.bar(
+                df_nav_m, x="period", y="invest_gain",
+                labels={"period": "Tháng (YYYY-MM)", "invest_gain": "Lợi nhuận đầu tư thuần (VND)"},
+                title="Lợi nhuận đầu tư thuần từng tháng (Thay đổi NAV - Vốn nộp/rút)",
+            )
+            fig_nm.update_traces(marker_color=colors_nav_m)
+            fig_nm.update_layout(height=340, yaxis_tickformat=",.0f")
+            st.plotly_chart(fig_nm, use_container_width=True)
+
+            show_nm = pd.DataFrame({
+                "Tháng": df_nav_m.period,
+                "NAV đầu tháng": df_nav_m.nav_start,
+                "Vốn nộp/rút ròng": df_nav_m.net_flow,
+                "NAV cuối tháng": df_nav_m.nav_end,
+                "Biến động NAV": df_nav_m["diff"],
+                "Tăng trưởng NAV %": df_nav_m.pct,
+                "Lợi nhuận từ đầu tư": df_nav_m.invest_gain,
+                "Tỷ suất sinh lời thuần %": df_nav_m.invest_pct,
+            })
+            st.dataframe(
+                show_nm.sort_values("Tháng", ascending=False).style.format({
+                    "NAV đầu tháng": "{:,.0f}", "Vốn nộp/rút ròng": "{:+,.0f}",
+                    "NAV cuối tháng": "{:,.0f}", "Biến động NAV": "{:+,.0f}",
+                    "Tăng trưởng NAV %": "{:+.2f}%", "Lợi nhuận từ đầu tư": "{:+,.0f}",
+                    "Tỷ suất sinh lời thuần %": "{:+.2f}%",
+                }).map(lambda v: "color: #16a34a; font-weight: bold" if v > 0 else ("color: #dc2626; font-weight: bold" if v < 0 else ""),
+                       subset=["Biến động NAV", "Tăng trưởng NAV %", "Lợi nhuận từ đầu tư", "Tỷ suất sinh lời thuần %"]),
+                hide_index=True, use_container_width=True
+            )
+
+        st.subheader("2. Chi tiết lệnh bán chốt lời/lỗ & Cổ tức theo từng tháng")
         df_month = E.performance_by_period(conn, period="month", owner_id=filter_oid)
         if df_month.empty:
             st.info("Chưa có giao dịch chốt lời/lỗ hoặc cổ tức theo tháng.")
@@ -305,10 +377,10 @@ elif page == "📈 Hiệu suất đầu tư":
             fig_m = px.bar(
                 df_month, x="period", y="total_profit",
                 labels={"period": "Tháng (YYYY-MM)", "total_profit": "Tổng lợi nhuận (VND)"},
-                title="Biểu đồ lãi/lỗ theo từng tháng",
+                title="Lợi nhuận đã chốt theo từng tháng (Bán cổ phiếu + Cổ tức)",
             )
             fig_m.update_traces(marker_color=colors)
-            fig_m.update_layout(height=360, yaxis_tickformat=",.0f")
+            fig_m.update_layout(height=340, yaxis_tickformat=",.0f")
             st.plotly_chart(fig_m, use_container_width=True)
 
             # Table display

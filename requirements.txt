@@ -202,3 +202,5 @@ websockets==17.2
     # via streamlit
 zipp==4.1.1
     # via importlib-metadata
+gspread>=6.1.0
+google-auth>=2.30.0

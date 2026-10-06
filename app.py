@@ -75,6 +75,29 @@ page = st.sidebar.radio(
 )
 st.sidebar.caption("Giá cổ phiếu nhập theo **nghìn đồng** (vd 62.7 = 62.700đ) hoặc VND đầy đủ.")
 
+st.sidebar.divider()
+st.sidebar.markdown("☁️ **Lưu trữ Google Sheets**")
+sb_col1, sb_col2 = st.sidebar.columns(2)
+if sb_col1.button("📥 Tải về", help="Kéo dữ liệu mới nhất từ Google Sheets về app"):
+    try:
+        from portfolio import gsheet_sync
+        ok_sync = gsheet_sync.pull_from_sheets_to_sqlite(conn)
+        if ok_sync:
+            st.sidebar.success("Đã đồng bộ!")
+            st.rerun()
+        else:
+            st.sidebar.warning("Chưa có kết nối")
+    except Exception as e:
+        st.sidebar.error(str(e))
+
+if sb_col2.button("📤 Tải lên", help="Lưu toàn bộ database hiện tại lên Google Sheets"):
+    try:
+        from portfolio import gsheet_sync
+        gsheet_sync.push_all_to_sheet(conn)
+        st.sidebar.success("Đã lưu!")
+    except Exception as e:
+        st.sidebar.error(str(e))
+
 
 def price_input(label: str, key: str) -> float:
     v = st.number_input(label, min_value=0.0, step=0.05, format="%.2f", key=key)

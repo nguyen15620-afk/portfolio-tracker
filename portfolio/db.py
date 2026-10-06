@@ -118,6 +118,14 @@ def init_db(conn: sqlite3.Connection, seed_if_empty: bool = True) -> None:
             with open(seed_path, "r", encoding="utf-8") as f:
                 conn.executescript(f.read())
             conn.commit()
+
+    # Attempt to pull latest changes from Google Sheets if configured
+    try:
+        from . import gsheet_sync
+        gsheet_sync.pull_from_sheets_to_sqlite(conn)
+    except Exception as e:
+        log.debug("Google Sheets initial pull skipped: %s", e)
+
     for k, v in DEFAULT_SETTINGS.items():
         conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
     conn.commit()
@@ -147,3 +155,8 @@ def set_setting(conn: sqlite3.Connection, key: str, value) -> None:
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, str(value)),
         )
+    try:
+        from . import gsheet_sync
+        gsheet_sync.push_table_to_sheet(conn, "settings")
+    except Exception:
+        pass

@@ -16,6 +16,14 @@ import pandas as pd
 
 from .db import get_setting, tx
 
+def _push_tables(conn: sqlite3.Connection, *tables: str) -> None:
+    try:
+        from . import gsheet_sync
+        for t in tables:
+            gsheet_sync.push_table_to_sheet(conn, t)
+    except Exception:
+        pass
+
 CASH_SIGN = {
     "OPENING": 1,
     "DEPOSIT": 1,
@@ -49,6 +57,7 @@ def _d(d) -> str:
 def add_owner(conn: sqlite3.Connection, name: str) -> int:
     with tx(conn):
         cur = conn.execute("INSERT INTO owners(name) VALUES (?)", (name.strip(),))
+    _push_tables(conn, "owners")
     return cur.lastrowid
 
 
@@ -69,6 +78,7 @@ def add_cash(conn, date, owner_id: int, type_: str, amount: float, note: str = "
             "VALUES (?,?,?,?,?,?,?)",
             (_d(date), owner_id, type_, signed, symbol, group_id, note),
         )
+    _push_tables(conn, "cash_tx")
 
 
 def transfer_cash(conn, date, from_owner: int, to_owner: int, amount: float, note: str = "") -> str:
@@ -131,6 +141,7 @@ def add_trade(conn, date, symbol: str, side: str, price: float,
                 "VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (_d(date), o, symbol, side, q, price, f, t, gid, note),
             )
+    _push_tables(conn, "trades")
     return gid
 
 
@@ -142,6 +153,7 @@ def add_opening_position(conn, date, owner_id: int, symbol: str, qty: float,
             "VALUES (?,?,?,?,?,?,?,?)",
             (_d(date), owner_id, symbol.upper().strip(), "OPEN", qty, avg_price, _gid(), note),
         )
+    _push_tables(conn, "trades")
 
 
 def transfer_shares(conn, date, from_owner: int, to_owner: int, symbol: str, qty: float,
@@ -163,6 +175,7 @@ def transfer_shares(conn, date, from_owner: int, to_owner: int, symbol: str, qty
                 "VALUES (?,?,?,?,?,?,?,?)",
                 (_d(date), o, symbol, side, qty, price, gid, note),
             )
+    _push_tables(conn, "trades")
     return gid
 
 
@@ -172,6 +185,7 @@ def delete_group(conn, group_id: str) -> None:
         conn.execute("DELETE FROM trades WHERE group_id = ?", (group_id,))
         conn.execute("DELETE FROM cash_tx WHERE group_id = ?", (group_id,))
         conn.execute("DELETE FROM corporate_actions WHERE group_id = ?", (group_id,))
+    _push_tables(conn, "trades", "cash_tx", "corporate_actions")
 
 
 def delete_row(conn, table: str, row_id: int) -> None:
@@ -179,6 +193,7 @@ def delete_row(conn, table: str, row_id: int) -> None:
         raise ValueError(table)
     with tx(conn):
         conn.execute(f"DELETE FROM {table} WHERE id = ?", (row_id,))
+    _push_tables(conn, table)
 
 
 # --------------------------------------------------------------------------- corporate actions
@@ -226,6 +241,7 @@ def apply_corporate_action(conn, ex_date, symbol: str, kind: str, value: float,
                 result[r.owner_id] = new
             else:
                 raise ValueError("kind phải là CASH hoặc STOCK")
+    _push_tables(conn, "corporate_actions", "cash_tx" if kind == "CASH" else "trades")
     return result
 
 

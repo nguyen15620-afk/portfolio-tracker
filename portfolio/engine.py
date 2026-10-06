@@ -550,7 +550,25 @@ def net_contributions(conn, as_of: str | None = None) -> dict[int, float]:
         custom = get_setting(conn, f"custom_net_contrib_{o}")
         if custom is not None:
             try:
-                out[o] = float(custom)
+                base_val = float(custom)
+                base_date = get_setting(conn, f"custom_net_contrib_date_{o}", cast=str) or "2026-10-04"
+                # If as_of is explicitly earlier than base_date, keep earlier calculated ledger
+                if as_of and as_of < base_date:
+                    continue
+                # Add subsequent cash contributions / withdrawals after base_date
+                sub_cash = cash[(cash.owner_id == o) & (cash.date > base_date) & (cash.type.isin(CONTRIB_TYPES))]
+                delta_cash = float(sub_cash.amount.sum()) if not sub_cash.empty else 0.0
+                # Add subsequent share transfers after base_date
+                sub_tr = load_trades(conn, as_of)
+                sub_tr = sub_tr[(sub_tr.owner_id == o) & (sub_tr.date > base_date)] if not sub_tr.empty else pd.DataFrame()
+                delta_tr = 0.0
+                if not sub_tr.empty:
+                    for t in sub_tr.itertuples():
+                        if t.side in ("OPEN", "TRANSFER_IN"):
+                            delta_tr += t.qty * t.price
+                        elif t.side == "TRANSFER_OUT":
+                            delta_tr -= t.qty * t.price
+                out[o] = base_val + delta_cash + delta_tr
             except (ValueError, TypeError):
                 pass
     return out

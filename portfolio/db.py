@@ -101,7 +101,8 @@ def connect(db_path: str | Path | None = None) -> sqlite3.Connection:
     final_path = Path(db_path) if not is_mem else db_path
     if isinstance(final_path, Path):
         final_path.parent.mkdir(parents=True, exist_ok=True)
-    is_default = (not is_mem and Path(final_path) == Path(DEFAULT_DB))
+    is_test = bool(os.environ.get("PYTEST_CURRENT_TEST") or (not is_mem and "pytest" in str(final_path)))
+    is_default = (not is_mem and not is_test and Path(final_path).name == "portfolio.db")
     conn = sqlite3.connect(str(final_path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -115,9 +116,11 @@ def init_db(conn: sqlite3.Connection, seed_if_empty: bool = True) -> None:
     if seed_if_empty and cur.fetchone()[0] == 0:
         seed_path = Path(__file__).resolve().parent.parent / "data" / "init_data.sql"
         if seed_path.exists():
+            conn.execute("PRAGMA foreign_keys = OFF")
             with open(seed_path, "r", encoding="utf-8") as f:
                 conn.executescript(f.read())
             conn.commit()
+            conn.execute("PRAGMA foreign_keys = ON")
 
     # Attempt to pull latest changes from Google Sheets if configured
     try:

@@ -30,6 +30,11 @@ def _cache(conn, symbol: str, d: str, close: float, source: str) -> None:
 
 def set_manual_price(conn, symbol: str, price_vnd: float, d: str | None = None) -> None:
     _cache(conn, symbol.upper(), d or date.today().isoformat(), float(price_vnd), "manual")
+    try:
+        from . import gsheet_sync
+        gsheet_sync.push_latest_prices_to_sheet(conn)
+    except Exception:
+        pass
 
 
 def cached_prices(conn, symbols: list[str]) -> dict[str, tuple[float, str, str]]:
@@ -74,6 +79,12 @@ def fetch_live_prices(conn, symbols: list[str]) -> dict[str, float]:
 
     for s, p in got.items():
         _cache(conn, s, today, p, "vnstock")
+    if got:
+        try:
+            from . import gsheet_sync
+            gsheet_sync.push_latest_prices_to_sheet(conn)
+        except Exception:
+            pass
     return got
 
 

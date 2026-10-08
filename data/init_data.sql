@@ -1,5 +1,5 @@
 BEGIN TRANSACTION;
-CREATE TABLE cash_tx (
+CREATE TABLE IF NOT EXISTS cash_tx (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     date      TEXT NOT NULL,
     owner_id  INTEGER NOT NULL REFERENCES owners(id),
@@ -26,7 +26,7 @@ INSERT INTO "cash_tx" VALUES(81,'2026-08-05',1,'DEPOSIT',3000000.0,NULL,NULL,'')
 INSERT INTO "cash_tx" VALUES(82,'2026-08-06',1,'DIVIDEND',380000.0,'MWG','aaa3d2d03a98','Cổ tức tiền 1000đ/cp');
 INSERT INTO "cash_tx" VALUES(83,'2026-08-20',1,'DIVIDEND',42750.0,'BID','b10bc5fd23a6','Cổ tức tiền 450đ/cp');
 INSERT INTO "cash_tx" VALUES(84,'2026-10-04',1,'DEPOSIT',406495.0,NULL,NULL,'');
-CREATE TABLE cash_tx_backup_daily_log(
+CREATE TABLE IF NOT EXISTS cash_tx_backup_daily_log(
   id INT,
   date TEXT,
   owner_id INT,
@@ -53,7 +53,7 @@ INSERT INTO "cash_tx_backup_daily_log" VALUES(48,'2026-08-06',2,'DIVIDEND',38000
 INSERT INTO "cash_tx_backup_daily_log" VALUES(49,'2026-08-20',2,'DIVIDEND',42750.0,'BID','b10bc5fd23a6','Cổ tức tiền 450đ/cp');
 INSERT INTO "cash_tx_backup_daily_log" VALUES(50,'2026-08-20',1,'DIVIDEND',42750.0,'BID','b10bc5fd23a6','Cổ tức tiền 450đ/cp');
 INSERT INTO "cash_tx_backup_daily_log" VALUES(51,'2026-10-04',1,'DEPOSIT',406495.0,NULL,NULL,'');
-CREATE TABLE corporate_actions (
+CREATE TABLE IF NOT EXISTS corporate_actions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     ex_date    TEXT NOT NULL,
     symbol     TEXT NOT NULL,
@@ -68,13 +68,13 @@ INSERT INTO "corporate_actions" VALUES(2,'2026-08-20','BID','CASH',85500.0,'2026
 INSERT INTO "corporate_actions" VALUES(3,'2026-08-06','MWG','CASH',10.0,'2026-08-06','affea4db564a','');
 INSERT INTO "corporate_actions" VALUES(4,'2026-08-06','MWG','CASH',1000.0,'2026-08-06','aaa3d2d03a98','');
 INSERT INTO "corporate_actions" VALUES(5,'2026-08-20','BID','CASH',450.0,'2026-08-20','b10bc5fd23a6','');
-CREATE TABLE owners (
+CREATE TABLE IF NOT EXISTS owners (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     name    TEXT NOT NULL UNIQUE
 );
 INSERT INTO "owners" VALUES(1,'I');
 INSERT INTO "owners" VALUES(2,'Mẹ');
-CREATE TABLE prices (
+CREATE TABLE IF NOT EXISTS prices (
     symbol  TEXT NOT NULL,
     date    TEXT NOT NULL,
     close   REAL NOT NULL,
@@ -10207,7 +10207,7 @@ INSERT INTO "prices" VALUES('DIG','2026-09-29',9530.0,'vnstock');
 INSERT INTO "prices" VALUES('DIG','2026-09-30',9570.0,'vnstock');
 INSERT INTO "prices" VALUES('DIG','2026-10-01',9550.0,'vnstock');
 INSERT INTO "prices" VALUES('DIG','2026-10-02',9250.0,'vnstock');
-CREATE TABLE settings (
+CREATE TABLE IF NOT EXISTS settings (
     key    TEXT PRIMARY KEY,
     value  TEXT NOT NULL
 );
@@ -10216,7 +10216,7 @@ INSERT INTO "settings" VALUES('sell_tax_rate','0.001');
 INSERT INTO "settings" VALUES('div_tax_rate','0.05');
 INSERT INTO "settings" VALUES('custom_net_contrib_1','65440775.0');
 INSERT INTO "settings" VALUES('custom_net_contrib_2','68000000.0');
-CREATE TABLE snapshots (
+CREATE TABLE IF NOT EXISTS snapshots (
     date        TEXT NOT NULL,
     owner_id    INTEGER NOT NULL REFERENCES owners(id),
     cash        REAL NOT NULL,
@@ -10227,7 +10227,7 @@ CREATE TABLE snapshots (
 );
 INSERT INTO "snapshots" VALUES('2026-10-04',1,-719698.0,7.10076601246843338e+07,7.02879621246843338e+07,65440775.0);
 INSERT INTO "snapshots" VALUES('2026-10-04',2,429418.0,69122600.0,69552018.0,68000000.0);
-CREATE TABLE trades (
+CREATE TABLE IF NOT EXISTS trades (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     date      TEXT NOT NULL,
     owner_id  INTEGER NOT NULL REFERENCES owners(id),

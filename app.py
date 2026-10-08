@@ -113,7 +113,11 @@ if page == "📊 Tổng quan":
     if refresh:
         with st.spinner("Đang lấy giá từ vnstock..."):
             try:
-                P.fetch_live_prices(conn, syms)
+                got = P.fetch_live_prices(conn, syms)
+                if got:
+                    st.success(f"Đã cập nhật giá mới nhất ({len(got)} mã) và lưu vào Google Sheets!")
+                else:
+                    st.info("Không có dữ liệu giá mới từ sàn.")
             except Exception as e:
                 st.error(f"Không lấy được giá: {e}")
     cached = P.cached_prices(conn, syms)

@@ -26,6 +26,7 @@ INSERT INTO "cash_tx" VALUES(81,'2026-08-05',1,'DEPOSIT',3000000.0,NULL,NULL,'')
 INSERT INTO "cash_tx" VALUES(82,'2026-08-06',1,'DIVIDEND',380000.0,'MWG','aaa3d2d03a98','Cổ tức tiền 1000đ/cp');
 INSERT INTO "cash_tx" VALUES(83,'2026-08-20',1,'DIVIDEND',42750.0,'BID','b10bc5fd23a6','Cổ tức tiền 450đ/cp');
 INSERT INTO "cash_tx" VALUES(84,'2026-10-04',1,'DEPOSIT',406495.0,NULL,NULL,'');
+INSERT INTO "cash_tx" VALUES(85,'2026-10-05',1,'DEPOSIT',10000000.0,NULL,NULL,'');
 CREATE TABLE IF NOT EXISTS cash_tx_backup_daily_log(
   id INT,
   date TEXT,
@@ -10474,9 +10475,10 @@ INSERT INTO "trades" VALUES(642,'2026-09-21',1,'HPG','BUY',100.0,21150.0,3172.0,
 INSERT INTO "trades" VALUES(643,'2026-09-21',2,'HPG','BUY',100.0,21150.0,3173.0,0.0,'ba2571b618ef','');
 INSERT INTO "trades" VALUES(644,'2026-09-30',1,'HPG','BUY',100.0,20350.0,3052.0,0.0,'bedd249f5565','');
 INSERT INTO "trades" VALUES(645,'2026-09-30',2,'HPG','BUY',100.0,20350.0,3053.0,0.0,'bedd249f5565','');
+INSERT INTO "trades" VALUES(646,'2026-10-05',1,'HPG','BUY',200.0,20550.0,6165.0,0.0,'455e6ca187e8','');
 DELETE FROM "sqlite_sequence";
 INSERT INTO "sqlite_sequence" VALUES('owners',2);
-INSERT INTO "sqlite_sequence" VALUES('trades',645);
+INSERT INTO "sqlite_sequence" VALUES('trades',646);
 INSERT INTO "sqlite_sequence" VALUES('cash_tx',85);
 INSERT INTO "sqlite_sequence" VALUES('corporate_actions',5);
 COMMIT;

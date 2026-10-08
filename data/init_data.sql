@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS owners (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     name    TEXT NOT NULL UNIQUE
 );
-INSERT INTO "owners" VALUES(1,'I');
+INSERT INTO "owners" VALUES(1,'Tôi');
 INSERT INTO "owners" VALUES(2,'Mẹ');
 CREATE TABLE IF NOT EXISTS prices (
     symbol  TEXT NOT NULL,
@@ -10477,6 +10477,6 @@ INSERT INTO "trades" VALUES(645,'2026-09-30',2,'HPG','BUY',100.0,20350.0,3053.0,
 DELETE FROM "sqlite_sequence";
 INSERT INTO "sqlite_sequence" VALUES('owners',2);
 INSERT INTO "sqlite_sequence" VALUES('trades',645);
-INSERT INTO "sqlite_sequence" VALUES('cash_tx',84);
+INSERT INTO "sqlite_sequence" VALUES('cash_tx',85);
 INSERT INTO "sqlite_sequence" VALUES('corporate_actions',5);
 COMMIT;
